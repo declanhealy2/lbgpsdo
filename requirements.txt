@@ -1,1 +1,1 @@
-hid
+hidapi

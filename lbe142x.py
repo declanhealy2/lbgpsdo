@@ -67,7 +67,7 @@ class GPSDODevice(object):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :returns: USB device information descriptors
         :rtype: list of dict
@@ -76,7 +76,8 @@ class GPSDODevice(object):
         for d in cls.enumerate():
             if serial is not None and serial != d['serial_number']:
                 continue
-            if device is not None and device != d['path']:
+            device_path = d['path'].decode() if isinstance(d['path'], bytes) else d['path']
+            if device is not None and device != device_path:
                 continue
             yield d
 
@@ -93,7 +94,7 @@ class GPSDODevice(object):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :raises: :class:`ValueError`: Filter criterias are not unique.
 
@@ -121,7 +122,7 @@ class GPSDODevice(object):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :returns: List of device instance
         :rtype: list of GPSDODevice
@@ -159,7 +160,8 @@ class GPSDODevice(object):
         self.version_major = (dinfo['release_number'] & 0xff00) >> 8
         self.version_minor =  dinfo['release_number'] & 0x00ff
 
-        self.device = hid.Device(path = dinfo['path'])
+        self.device = hid.device()
+        self.device.open_path(dinfo['path'])
         self.read()
 
 
@@ -173,7 +175,7 @@ class GPSDODevice(object):
         Read status and configuration from the device.
         """
 
-        buf = self.device.get_feature_report(0x4b, 60)
+        buf = bytes(self.device.get_feature_report(0x4b, 60))
 
         # self.loss_count = buf[0]
         self.sat_lock = bool(buf[1] & 0x01)
@@ -408,7 +410,7 @@ class GPSDODevice(object):
             result += "       ---   "
         else:
             result += "%10d Hz" % self.f2
-        result += "  level: %s\n" % ( "LOW" if self.out1low else "NORMAL" )
+        result += "  level: %s\n" % ( "LOW" if self.out2low else "NORMAL" )
 
         result += "\n"
 

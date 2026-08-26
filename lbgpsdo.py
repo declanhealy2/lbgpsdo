@@ -672,7 +672,7 @@ class GPSDODevice(GPSDO):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :returns: USB device information descriptors
         :rtype: list of dict
@@ -681,7 +681,8 @@ class GPSDODevice(GPSDO):
         for d in cls.enumerate():
             if serial is not None and serial != d['serial_number']:
                 continue
-            if device is not None and device != d['path']:
+            device_path = d['path'].decode() if isinstance(d['path'], bytes) else d['path']
+            if device is not None and device != device_path:
                 continue
             yield d
 
@@ -698,7 +699,7 @@ class GPSDODevice(GPSDO):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :raises: :class:`ValueError`: Filter criterias are not unique.
 
@@ -726,7 +727,7 @@ class GPSDODevice(GPSDO):
         :param serial: Serial Number of the device
         :type serial: str | None
         :param device: Device path
-        :type device: bytes | None
+        :type device: str | None
 
         :returns: List of device instance
         :rtype: list of GPSDODevice
@@ -764,7 +765,8 @@ class GPSDODevice(GPSDO):
         self.version_major = (dinfo['release_number'] & 0xff00) >> 8
         self.version_minor =  dinfo['release_number'] & 0x00ff
 
-        self.device = hid.Device(path = dinfo['path'])
+        self.device = hid.device()
+        self.device.open_path(dinfo['path'])
 
 
     def __del__(self):
@@ -814,7 +816,7 @@ class GPSDODevice(GPSDO):
         :rtype: dict
         """
 
-        buf = self.device.get_feature_report(9, 60)
+        buf = bytes(self.device.get_feature_report(9, 60))
 
         result = {}
         result['out1']   = bool(buf[0] & self.OUTPUT1)
