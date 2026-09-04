@@ -449,3 +449,19 @@ See
  * <https://github.com/bvernoux/lbe-142x>
 
 for further configuration utilities.
+
+Additional LBE-1421 tools
+-------------------------
+
+This fork also provides a single command for the LBE-1421 tools:
+
+```
+uv run lb.py list
+uv run lb.py inspect
+uv run lb.py set --output 1 --hz 10000000
+uv run lb.py log --output logs/session
+```
+
+Use `lb.py --help` for the available commands. The logger records device
+status, raw HID reports, and UBX receiver messages. Use `--json` with
+`inspect` or `set` when another program needs to read the result.
