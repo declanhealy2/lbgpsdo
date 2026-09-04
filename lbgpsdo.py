@@ -20,15 +20,15 @@
 #
 
 import argparse
-from fractions import Fraction
-import hid
 import json
 import math
 import struct
 import sys
 import time
+from fractions import Fraction
+from typing import ClassVar
 
-
+import hid
 
 USBIDS = \
 [
@@ -49,12 +49,12 @@ class GPSDOConfigurationException(Exception):
     def errortext(self):
         result = ""
         for attr, msg in self.args[0].items():
-            result += "%-7s %s\n" % ( attr + ":", msg )
+            result += f"{attr + ':':7} {msg}\n"
         return result
 
 
 
-class GPSDO(object):
+class GPSDO:
     """
     Virtual GPSDO device independent from a real device.
 
@@ -69,7 +69,7 @@ class GPSDO(object):
     LEVEL_VALUE_24MA = 2
     LEVEL_VALUE_32MA = 3
 
-    LEVEL_DISPLAY = \
+    LEVEL_DISPLAY: ClassVar = \
     {
         0:  "8 mA",
         1: "16 mA",
@@ -77,7 +77,7 @@ class GPSDO(object):
         3: "32 mA",
     }
 
-    LEVEL_VALUE = \
+    LEVEL_VALUE: ClassVar = \
     {
          8: LEVEL_VALUE_8MA,
         16: LEVEL_VALUE_16MA,
@@ -117,7 +117,7 @@ class GPSDO(object):
 
 
     _CONFIG_CHECKS = \
-    [
+    (
         ( 'fin',    "GPS reference frequency",     LIMIT_FIN_MIN, LIMIT_FIN_MAX, 0, "in the range of 10 kHz to 16 MHz" ),
         ( 'n3',     "Input divider N3",                        1,         2**19, 0, "in the range of 1 to 524288"      ),
         ( 'n2_hs',  "Feedback divider N2_HS",                  4,            11, 0, "in the range of 4 to 11"          ),
@@ -127,15 +127,15 @@ class GPSDO(object):
         ( 'nc2_ls', "Output 2 divider NC2_LS",                 2,         2**20, 1, "in the range of 1 to 1048576"     ),
         ( 'skew',   "SKEW",                                    0,           255, 0, "in the range of 0 to 255"         ),
         ( 'bw',     "BWSEL",                                   0,            15, 0, "in the range of 0 to 15"          ),
-    ]
+    )
 
     _FREQ_CHECKS = \
-    [
+    (
         ( 'f3',    "Phase detector frequency", LIMIT_F3_MIN,   LIMIT_F3_MAX,   "must be in the range of 2 kHz to 2 MHz"       ),
         ( 'fosc',  "Oscillator frequency",     LIMIT_FOSC_MIN, LIMIT_FOSC_MAX, "must be in the range of 4.85 GHz to 5.67 GHz" ),
         ( 'fout1', "Output 1 frequency",       LIMIT_FOUT_MIN, LIMIT_FOUT_MAX, "must be in the range of 450 Hz to 808 MHz"    ),
         ( 'fout2', "Output 2 frequency",       LIMIT_FOUT_MIN, LIMIT_FOUT_MAX, "must be in the range of 450 Hz to 808 MHz"    ),
-    ]
+    )
 
 
     def __init__(self, *args, **kwargs):
@@ -203,19 +203,19 @@ class GPSDO(object):
                 continue
 
             if not isinstance(value, int):
-                errdict[attr] = "%s must be an integer." % name
+                errdict[attr] = f"{name} must be an integer."
                 continue
 
             if (vmin is not None and value < vmin) or \
                (vmax is not None and value > vmax):
-                errdict[attr] = "%s must be %s." % ( name, msg )
+                errdict[attr] = f"{name} must be {msg}."
 
             if even and (value % 2):
                 if even == 1 and value != 1:
-                    errdict[attr] = "%s must be 1 or even." % name
+                    errdict[attr] = f"{name} must be 1 or even."
                     continue
 
-                errdict[attr] = "%s must be even." % name
+                errdict[attr] = f"{name} must be even."
                 continue
 
         if level is not None and (level < 0 or level > 3):
@@ -259,7 +259,7 @@ class GPSDO(object):
         :rtype: dict
         """
 
-        freq, errdict, errflag = self.freqplan(ignore_freq_limits = ignore_freq_limits)
+        _freq, errdict, errflag = self.freqplan(ignore_freq_limits = ignore_freq_limits)
         if errflag:
             raise GPSDOConfigurationException({ a: v for a, v in errdict.items() if v is not None })
 
@@ -338,7 +338,7 @@ class GPSDO(object):
 
         # Check for undefined settings.
         for attr, name, lmin, lmax, even, msg in self._CONFIG_CHECKS:
-            errdict[attr] = ("%s undefined." % name) if getattr(self, attr, None) is None else None
+            errdict[attr] = (f"{name} undefined.") if getattr(self, attr, None) is None else None
 
         # Compute frequency plan.
         f3            = None if self.fin    is None or self.n3    is None                        else Fraction(self.fin, self.n3)
@@ -366,11 +366,11 @@ class GPSDO(object):
         for attr, name, lmin, lmax, msg in self._FREQ_CHECKS:
             value = freq[attr]
             if value is None:
-                errdict[attr] = "%s undefined." % name
+                errdict[attr] = f"{name} undefined."
             elif ignore_freq_limits:
                 errdict[attr] = None
             elif value < lmin or value > lmax:
-                errdict[attr] = "%s is %s, but %s." % ( name, self._format_freq(value), msg )
+                errdict[attr] = f"{name} is {self._format_freq(value)}, but {msg}."
             else:
                 errdict[attr] = None
 
@@ -379,11 +379,11 @@ class GPSDO(object):
             # GPSDO produces wrong signals for SKEW = NC2_LS - 1, so we limit to NC2_LS - 2.
             skewmax = max(self.nc2_ls - 2, 0)
             if self.skew > skewmax:
-                errdict['skew'] = "SKEW must be in the range of 0 to %d (= NC2_LS - 2)" % skewmax
+                errdict['skew'] = f"SKEW must be in the range of 0 to {skewmax} (= NC2_LS - 2)"
         if 'skew' not in errdict:
             errdict['skew'] = None
 
-        return freq, errdict, any([ v is not None for v in errdict.values() ])
+        return freq, errdict, any(v is not None for v in errdict.values())
 
 
     def _scale_freq(self, value):
@@ -417,7 +417,7 @@ class GPSDO(object):
         if valuenum is None:
             return None
         else:
-            return "%7.3f %-3s" % ( valuenum, valueunit )
+            return f"{valuenum:7.3f} {valueunit:3}"
 
 
     def _format_duration(self, value):
@@ -426,100 +426,79 @@ class GPSDO(object):
         if valuenum is None:
             return None
         else:
-            return "%7.3f %-2s" % ( valuenum, valueunit )
+            return f"{valuenum:7.3f} {valueunit:2}"
 
 
     def _format_phaseangle(self, value):
         if value is None:
-            None
+            return None
         else:
-            return "%7.3f °" % (value * 360)
+            return f"{value * 360:7.3f} °"
 
 
     def _format_scaler_line(self, value, name, text):
-        return "%-6s = %7s  %s\n" % \
-            (
-                name,
-                ("%d" % value) if value is not None else "---",
-                text,
-            )
+        displayed_value = value if value is not None else "---"
+        return f"{name:<6} = {displayed_value:>7}  {text}\n"
 
 
     def _format_freq_line(self, value, err, name, text, fraction):
         if value is not None:
-            valuefloat = "%10.0f Hz" % value
-            valuefrac  = ("%10d/%4d Hz" % ( value.numerator, value.denominator )) if fraction else ""
+            valuefloat = f"{value:10.0f} Hz"
+            valuefrac = f"{value.numerator:10d}/{value.denominator:4d} Hz" if fraction else ""
             valueexact = value.denominator == 1
         else:
             valuefloat = "---"
             valuefrac  = "---" if fraction else ""
             valueexact = True
 
-        return "%-6s = %18s %s %13s  %2s %s\n" % \
-            (
-                name,
-                valuefrac,
-                ("=" if valueexact else "≈") if fraction else " ",
-                valuefloat,
-                "!!" if err is not None else "",
-                text,
-            )
+        relation = ("=" if valueexact else "≈") if fraction else " "
+        error_marker = "!!" if err is not None else ""
+        return (
+            f"{name:<6} = {valuefrac:>18} {relation} {valuefloat:>13}  "
+            f"{error_marker:>2} {text}\n"
+        )
 
 
     def _format_phase_line(self, phase, phaseangle, phaseres, phaseangleres):
         phase, phaseunit = self._scale_duration(phase)
         if phase is not None:
-            phasefloat = "%10.3f %-2s" % ( phase, phaseunit )
-            phasefrac  = "%10d/%4d %-2s" % ( phase.numerator, phase.denominator, phaseunit )
+            phasefloat = f"{phase:10.3f} {phaseunit:2}"
+            phasefrac = f"{phase.numerator:10d}/{phase.denominator:4d} {phaseunit:2}"
         else:
             phasefloat = "---"
             phasefrac  = "---"
 
         if phaseangle is not None:
             value = phaseangle * 360
-            phaseanglefloat = "%7.3f ° " % ( value )
-            phaseanglefrac  = "%10d/%4d ° " % ( value.numerator, value.denominator )
+            phaseanglefloat = f"{value:7.3f} ° "
+            phaseanglefrac = f"{value.numerator:10d}/{value.denominator:4d} ° "
         else:
             phaseanglefloat = "---"
             phaseanglefrac  = "---"
 
         phaseres, phaseresunit = self._scale_duration(phaseres)
         if phaseres is not None:
-            phaseresfloat = "%10.3f %-2s" % ( phaseres, phaseresunit )
-            phaseresfrac  = "%10d/%4d %-2s" % ( phaseres.numerator, phaseres.denominator, phaseresunit )
+            phaseresfloat = f"{phaseres:10.3f} {phaseresunit:2}"
+            phaseresfrac = (
+                f"{phaseres.numerator:10d}/{phaseres.denominator:4d} {phaseresunit:2}"
+            )
         else:
             phaseresfloat = "---"
             phaseresfrac  = "---"
 
         if phaseangleres is not None:
             value = phaseangleres * 360
-            phaseangleresfloat = "%7.3f ° " % ( value )
-            phaseangleresfrac  = "%10d/%4d ° " % ( value.numerator, value.denominator )
+            phaseangleresfloat = f"{value:7.3f} ° "
+            phaseangleresfrac = f"{value.numerator:10d}/{value.denominator:4d} ° "
         else:
             phaseangleresfloat = "---"
             phaseangleresfrac  = "---"
 
         result = ""
-        result += "phase  = %18s = %13s     Phase offset output 1 --> 2\n" % \
-            (
-                phasefrac,
-                phasefloat,
-            )
-        result += "       = %18s = %13s     Phase angle w.r.t output 2\n" % \
-            (
-                phaseanglefrac,
-                phaseanglefloat,
-            )
-        result += "pres   = %18s = %13s     Phase offset resolution\n" % \
-            (
-                phaseresfrac,
-                phaseresfloat,
-            )
-        result += "       = %18s = %13s\n" % \
-            (
-                phaseangleresfrac,
-                phaseangleresfloat,
-            )
+        result += f"phase  = {phasefrac:>18} = {phasefloat:>13}     Phase offset output 1 --> 2\n"
+        result += f"       = {phaseanglefrac:>18} = {phaseanglefloat:>13}     Phase angle w.r.t output 2\n"
+        result += f"pres   = {phaseresfrac:>18} = {phaseresfloat:>13}     Phase offset resolution\n"
+        result += f"       = {phaseangleresfrac:>18} = {phaseangleresfloat:>13}\n"
 
         return result
 
@@ -547,10 +526,16 @@ class GPSDO(object):
 
         result += "Output settings\n"
         result += "---------------\n"
-        result += "Output 1:    %11s\n" % ((self._format_freq(freq['fout1']) or "---    ") if self.out1 else "")
-        result += "Output 2:    %11s\n" % ((self._format_freq(freq['fout2']) or "---    ") if self.out2 else "")
-        result += "Phase:       %9s  \n" % ((self._format_phaseangle(freq['phaseangle']) or "---   ") if self.out1 and self.out2 else "")
-        result += "Drive level: %10s \n" % self.LEVEL_DISPLAY[self.level]
+        output1 = (self._format_freq(freq['fout1']) or "---    ") if self.out1 else ""
+        output2 = (self._format_freq(freq['fout2']) or "---    ") if self.out2 else ""
+        phase = (
+            (self._format_phaseangle(freq['phaseangle']) or "---   ")
+            if self.out1 and self.out2 else ""
+        )
+        result += f"Output 1:    {output1:>11}\n"
+        result += f"Output 2:    {output2:>11}\n"
+        result += f"Phase:       {phase:>9}  \n"
+        result += f"Drive level: {self.LEVEL_DISPLAY[self.level]:>10} \n"
         result += "\n"
 
         result += "PLL settings\n"
@@ -561,8 +546,8 @@ class GPSDO(object):
         result += self._format_scaler_line(self.n1_hs,  "N1_HS",  "Output common divider factor")
         result += self._format_scaler_line(self.nc1_ls, "NC1_LS", "Output 1 divider factor")
         result += self._format_scaler_line(self.nc2_ls, "NC2_LS", "Output 2 divider factor")
-        result += "SKEW   =    %+4d  Clock skew\n"         % self.skew
-        result += "BWSEL  =     %3d  Loop bandwith code\n" % self.bw
+        result += f"SKEW   =    {self.skew:+4d}  Clock skew\n"
+        result += f"BWSEL  =     {self.bw:3d}  Loop bandwith code\n"
         result += "\n"
 
         result += "Frequency plan\n"
@@ -580,7 +565,7 @@ class GPSDO(object):
             result += "------\n"
             for attr, msg in errdict.items():
                 if msg is not None:
-                    result += "%-7s %s\n" % ( attr + ":", msg )
+                    result += f"{attr + ':':7} {msg}\n"
 
         return result
 
@@ -619,14 +604,11 @@ class GPSDO(object):
         flist.extend([ ( f[0], f[2], f[3] ) for f in self._CONFIG_CHECKS if f[0] == 'fin' ])
         flist.extend([ ( f[0], f[2], f[3] ) for f in self._FREQ_CHECKS                    ])
         for name, fmin, fmax in flist:
-            result += "%-5s = %-30s %s %s ... %s\n" % \
-                (
-                    name,
-                    formula[name] if name in formula else "",
-                    "=" if name in formula else " ",
-                    self._format_freq(fmin),
-                    self._format_freq(fmax),
-                )
+            result += (
+                f"{name:<5} = {formula.get(name, ''):<30} "
+                f"{'=' if name in formula else ' '} {self._format_freq(fmin)} ... "
+                f"{self._format_freq(fmax)}\n"
+            )
 
         return result
 
@@ -887,7 +869,7 @@ class GPSDODevice(GPSDO):
         """
 
         # Check settings.
-        freq, errdict, errflag = self.freqplan(ignore_freq_limits = ignore_freq_limits)
+        _freq, errdict, errflag = self.freqplan(ignore_freq_limits = ignore_freq_limits)
 
         # Dont't upload invalid settings.
         if errflag:
@@ -995,19 +977,19 @@ class GPSDODevice(GPSDO):
         if show_status:
             result += "Device information\n"
             result += "------------------\n"
-            result += "VID, PID:     0x%04x:0x%04x\n" % ( self.vid, self.pid )
-            result += "Device:       %s\n"            % self.path
-            result += "Product:      %s\n"            % self.product
-            result += "Manufacturer: %s\n"            % self.manufacturer
-            result += "S/N:          %s\n"            % self.serial
-            result += "Firmware:     %d.%d\n"         % ( self.version_major, self.version_minor )
+            result += f"VID, PID:     0x{self.vid:04x}:0x{self.pid:04x}\n"
+            result += f"Device:       {self.path}\n"
+            result += f"Product:      {self.product}\n"
+            result += f"Manufacturer: {self.manufacturer}\n"
+            result += f"S/N:          {self.serial}\n"
+            result += f"Firmware:     {self.version_major}.{self.version_minor}\n"
             result += "\n"
 
             result += "Device status\n"
             result += "-------------\n"
-            result += "Loss count:   %d\n" % self.loss_count
-            result += "SAT lock:     %s\n" % ( "LOCKED" if self.sat_lock else "unlocked" )
-            result += "PLL lock:     %s\n" % ( "LOCKED" if self.pll_lock else "unlocked" )
+            result += f"Loss count:   {self.loss_count}\n"
+            result += f"SAT lock:     {'LOCKED' if self.sat_lock else 'unlocked'}\n"
+            result += f"PLL lock:     {'LOCKED' if self.pll_lock else 'unlocked'}\n"
             result += "\n"
 
         result += super().infotext(*args, **kwargs)
@@ -1026,27 +1008,20 @@ class GPSDODevice(GPSDO):
 
 def command_list(args):
     for d in GPSDODevice.enumerate():
-        sys.stdout.write("%04x:%04x %-16s  %s  %s\n" % \
-            (
-                d['vendor_id'],
-                d['product_id'],
-                d['path'].decode(),
-                d['serial_number'],
-                d['product_string'],
-            ))
+        sys.stdout.write(
+            f"{d['vendor_id']:04x}:{d['product_id']:04x} "
+            f"{d['path'].decode():<16}  {d['serial_number']}  {d['product_string']}\n"
+        )
 
 
 def command_status(args):
     for d in GPSDODevice.openall(serial = args.serial, device = args.device):
         d.read_status()
-        sys.stdout.write("%-8s  %s: SAT %-8s  PLL %-8s  Loss: %d\n" % \
-            (
-                d.serial,
-                d.path,
-                "locked" if d.sat_lock else "unlocked",
-                "locked" if d.pll_lock else "unlocked",
-                d.loss_count,
-            ))
+        sys.stdout.write(
+            f"{d.serial:<8}  {d.path}: "
+            f"SAT {'locked' if d.sat_lock else 'unlocked':<8}  "
+            f"PLL {'locked' if d.pll_lock else 'unlocked':<8}  Loss: {d.loss_count}\n"
+        )
 
 
 def command_detail(args):

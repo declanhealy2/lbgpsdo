@@ -1,1 +1,11 @@
 __pycache__/
+*.pyc
+.venv/
+.uv/
+logs/
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.complexipy_cache/
+*.rules
